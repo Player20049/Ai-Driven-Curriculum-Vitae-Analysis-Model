@@ -31,11 +31,11 @@ This project was built as part of my BEng final year project at LSBU and also co
 
 ## 🖥 How to Run
 
-######### Step 1: MongoDB Setup #########
+### Step 1: MongoDB Setup #########
 
 This project uses MongoDB to store parsed CV data across phases.
 
-### Option 1: Run MongoDB Locally
+#### Option 1: Run MongoDB Locally
 
 1. Install MongoDB Community Edition:  
    https://www.mongodb.com/try/download/community 
@@ -47,10 +47,10 @@ brew services start mongodb-community
 
 # Windows (use MongoDB Compass or Services.msc)
 
-######### Step 2: Dependencies intallation #########
+### Step 2: Dependencies intallation #########
 pip install -r requirements.txt
 
-######### Step 3: Project Folder Structure #########
+### Step 3: Project Folder Structure #########
 Use VS Code for multiple language usage (python, Html, javascript) or any other compatible program and structure folder like this.
 
 AI-CV-Analysis-Model/
@@ -61,6 +61,8 @@ AI-CV-Analysis-Model/
 │   ├── LSBUPhase1.html
 │   ├── LSBUPhase2.html
 │   └── LSBUPhase3.html
+
+
 
 
 
