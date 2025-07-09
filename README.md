@@ -42,6 +42,7 @@ This project uses MongoDB to store parsed CV data across phases.
 
 2. Start the MongoDB service:
 
+```bash
 # macOS/Linux
 brew services start mongodb-community
 
