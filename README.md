@@ -42,12 +42,13 @@ This project uses MongoDB to store parsed CV data across phases.
 
 2. Start the MongoDB service:
 
-```bash
-# macOS/Linux
+
+#### macOS/Linux
 brew services start mongodb-community
 
-# Windows (use MongoDB Compass or Services.msc)
+#### Windows (use MongoDB Compass or Services.msc)
 
+```bash
 ### Step 2: Dependencies intallation #########
 pip install -r requirements.txt
 
