@@ -1,0 +1,388 @@
+<!DOCTYPE html> <!-- document type and version of HTML being used -->
+<html lang="en"> <!-- HTML document and sets the language to English -->
+<head>
+    <meta charset="UTF-8"> <!-- Sets the character encoding to UTF-8 for supporting special characters -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Ensures proper display on all device screen sizes -->
+    <title>Edit Skills and Contact Info</title> <!-- Sets the title of the web page -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- jQuery library for easy DOM manipulation and AJAX requests -->
+</head>
+<body>
+
+
+<!-- Job Title Input Section -->
+<div id="jobTitleSection" style="display: none;">  <!-- Container for the job title input, initially hidden -->
+    <h2>Type Your Job Title</h2> <!-- Heading prompting the user to type their job title -->
+    <input type="text" id="jobTitleInput" placeholder="Start typing your job title..." autocomplete="off"> <!-- Text input for job title -->
+    <ul id="jobSuggestions" style="list-style-type:none;"></ul> <!-- List to display job suggestions -->
+</div>
+
+<!-- CV Upload Form Section -->
+<form id="cvUploadForm" method="POST" enctype="multipart/form-data" style="display:none;"> <!-- Form with POST method to upload files -->
+    <h2>Edit your skills:</h2> <!-- Heading saying Edit your skills-->
+    <label for="file">Upload your CV:</label> <!-- Label for the file input -->
+    <input type="file" name="file" id="file" required> <!-- File input that accepts file uploads; required ensures it's not empty -->
+    <input type="submit" value="Upload CV"> <!-- Submit button to upload the file -->
+</form>
+
+<!-- Section to display the PDF, skills, experience, and contact info -->
+<div id="skillsSection" style="display: none;">
+    <iframe id="pdfViewer" style="width:100%;height:500px;"></iframe> <!-- Iframe to display uploaded PDF files directly in the browser -->
+
+    <!-- Contact Info Form -->
+    <form id="contactInfoForm" method="POST"> <!-- Form to edit user’s contact information -->
+        <h3>Edit Contact Information</h3> <!-- Heading for contact information section -->
+        <label for="email">Email:</label> <!-- Label for the email input -->
+        <input type="email" id="email" name="email" required><br> <!-- Email input; required ensures the user enters a valid email -->
+        <label for="phone">Phone:</label> <!-- Label for the phone input -->
+        <input type="text" id="phone" name="phone" required><br> <!-- Text inputing phone number; required ensures it's not left empty -->
+    </form>
+
+    <!-- Skills and Experience Form -->
+    <form id="skillsForm" method="POST"> <!-- Form for editing skills and experience -->
+        <p>Select skills to keep (uncheck to remove skills):</p> <!-- Instruction for the user -->
+        <ul id="skillsList"></ul> <!-- Unordered list where the suggested skills will be dynamically added -->        
+        <label for="experience">How many years of experience do you have in this field?</label> <!-- Label for experience input -->
+        <input type="number" id="experience" name="experience" min="0" required><br><br> <!-- Input for entering years of experience; must be a non-negative number -->
+        <input type="hidden" name="cv_text" id="cv_text"> <!-- Hidden input to store extracted CV text -->
+        <input type="submit" value="Save All"> <!-- Submit button to save selected skills and experience -->
+    </form>
+</div>
+
+<script>
+    $(document).ready(function() { // Wait until the document is fully loaded before executing the script
+
+        // Show CV upload form and job title section by default
+        $('#cvUploadForm').show(); // Displays the CV upload form when the page loads
+        $('#jobTitleSection').show(); // Displays the job title input section when the page loads
+    
+        // Hide the purpose section (if it's still in the code or temporarily commented out)
+        $('#purposeSection').hide(); // Hides the purpose section if it exists
+    
+        // Handle input for job title
+        $('#jobTitleInput').on('input', function() { // Add an event listener for the job title input field
+            var jobTitle = $(this).val(); // Get the value entered by the user in the job title field
+            if (jobTitle.length > 2) {  // Start fetching suggestions after 3 characters
+                $.ajax({
+                    url: '/search_jobs', // Endpoint to search for job titles
+                    type: 'GET', // Send a GET request to the server 
+                    data: { job_title: jobTitle }, // Pass the user-entered job title as a parameter
+                    success: function(response) { // Function to execute if the request is successful
+                        var jobSuggestions = $('#jobSuggestions'); // Get the list where suggestions will be shown
+                        jobSuggestions.empty(); // Clear previous suggestions
+                        if (response.jobs && response.jobs.length > 0) { // Check if jobs are returned in the response
+                            response.jobs.forEach(function(job) { // Loop through the jobs array in the response
+                                jobSuggestions.append('<li>' + job + '</li>'); // Append each job suggestion as a list item
+                            });
+                        } else {
+                            jobSuggestions.append('<li>No jobs found</li>'); // Show message if no jobs are found
+                        }
+                    },
+                    error: function() {
+                        alert('Error fetching job suggestions. Please try again.'); // Show an error alert if request fails
+                    }
+                });
+            }
+        });
+    
+        // Handle job selection and fetch skills
+        $(document).on('click', '#jobSuggestions li', function() { // Add a click event listener to the job suggestions list items
+            var selectedJob = $(this).text(); // Get the text content of the clicked suggestion
+            $('#jobTitleInput').val(selectedJob); // Set the input value to the selected job title
+            $('#jobSuggestions').empty(); // Clear the suggestions list after selecting a job
+    
+            $.ajax({
+                url: '/get_job_skills', // Endpoint to retrieve skills for the selected job
+                type: 'GET', // Send a GET request to the server
+                data: { job_title: selectedJob }, // Pass the selected job title as a parameter
+                success: function(response) { // Function to execute if the request is successful
+                    var skillsList = $('#skillsList'); // Get the list where skills will be shown
+                    skillsList.empty(); // Clear previous skills
+                    if (response.skills && response.skills.length > 0) { // Check if skills are returned in the response
+                        response.skills.forEach(function(skill) { // Loop through the skills array in the response
+                            skillsList.append('<li><input type="checkbox" name="skills" value="' + skill + '" checked> ' + skill + '</li>');
+                        });
+                    } else {
+                        skillsList.append('<li>No skills found for this job</li>'); // Show message if no skills are found
+                    }
+                },
+                error: function() { // Function to execute if the request fails
+                    alert('Error fetching job skills.'); // Show an error alert if request fails
+                }
+            });
+        });
+    
+        // Handle CV upload form submission
+        $('#cvUploadForm').on('submit', function(event) { // Attaches a 'submit' event handler to the form with id 'cvUploadForm'
+            event.preventDefault(); // Prevents the default form submission behavior basically it prevents page reload
+            var formData = new FormData(this); // Creates a FormData object from the form data which is used for file uploads
+    
+            $.ajax({
+                url: '/upload_cv', // Specifies the endpoint where the form data will be sent
+                type: 'POST', // Sends the data using the HTTP POST method
+                data: formData, // Passes the FormData object as the data to be sent
+                contentType: false, // Prevents jQuery from setting a content-type header (important for file uploads)
+                processData: false, // Prevents jQuery from processing the data into a query string
+                success: function(response) { // Callback function that executes if the request succeeds
+                    if (response.error) { // Checks if the response contains an error message
+                        alert(response.error); // Displays the error message in an alert box
+                        return; // Stops further execution if an error is present
+                    }
+                    $('#email').val(response.contact_info.email); // Sets the value of the #email input to the extracted email from the response
+                    $('#phone').val(response.contact_info.phone); // Sets the value of the #phone input to the extracted phone from the response
+                    $('#skillsList').empty(); // Clears any existing list items from the #skillsList element
+                    response.skills.forEach(function(skill) { // Loops through each skill in the response.skills array
+                        $('#skillsList').append('<li><input type="checkbox" name="skills" value="' + skill + '" checked> ' + skill + '</li>');
+                        // Creates a list item with a checked checkbox for each skill and appends it to #skillsList
+                    });
+                    $('#cv_text').val(response.cv_text); // Sets the value of the #cv_text input to the extracted CV text from the response
+                    $('#pdfViewer').attr('src', response.pdf_url); // Sets the source URL of the #pdfViewer iframe to the extracted PDF URL from the response
+                    $('#skillsSection').show(); // Displays the section with id #skillsSection which was previously hidden
+                    $('#cvUploadForm').hide(); // Hides the form with id #cvUploadForm after successful submission
+                },
+                error: function() { // Callback function that executes if the request fails
+                    alert('Error uploading CV. Please try again.'); // Displays an error message in a alert box
+                }
+            });
+        });
+    });
+
+    </script>
+    
+<!-- New Section to act as the empty page (hidden initially) -->
+<div id="emptyPageSection" style="display: none;">
+    <h1>Relevant Surveys/Quizzes to your CV</h1> <!-- Main heading to inform the user about the purpose of the section -->
+    <p>Below are all the Surveys/Quizzes that you can take. The locked icons are Surveys/Quizzes you do not qualify to take yet.</p>
+    <!-- Description explaining how the surveys/quizzes work and the concept of locked content -->
+    <div id="gamesContainer" style="display: flex; flex-wrap: wrap;">
+        <!-- Games will be dynamically inserted here -->
+    </div>
+</div>
+
+<!-- Game Details Section (Hidden initially) -->
+<div id="gameDetailSection" style="display:none;">
+    <h2 id="gameName"></h2> <!-- Placeholder for the game's name, which will be dynamically inserted -->
+    <img id="gameImage" src="" alt="Game Image" style="width:200px;"><br> <!-- Placeholder for the game image -->
+    <p id="gameDescription"></p> <!-- Placeholder for the game's description, which will be dynamically set -->
+    <p><strong>Required Skills:</strong> <span id="gameSkills"></span></p> 
+    <button id="backToGames">Back to Games</button> <!-- Button that allows the user to return to the list of available games -->
+</div>
+
+<script>
+
+    // Show CV upload form and job title section by default
+    $('#cvUploadForm').show();  
+    $('#jobTitleSection').show();  
+
+    // Hide the purpose section (if it's still in the code or temporarily commented out)
+    $('#purposeSection').hide();
+
+    $('#jobTitleInput').on('input', function() { // Attaches an event handler to the 'input' event on the #jobTitleInput element
+    var jobTitle = $(this).val(); // Retrieves the current value of the input field and stores it in the jobTitle variable
+    if (jobTitle.length > 2) {  // Start fetching suggestions after 3 characters
+        $.ajax({
+            url: '/search_jobs', // Specifies the endpoint to send the request to
+            type: 'GET', // Sends the request using the HTTP GET method
+            data: {job_title: jobTitle}, // Sends the input value as a query parameter named 'job_title'
+            success: function(response) { // Callback function that executes if the request succeeds
+                var jobSuggestions = $('#jobSuggestions'); // Selects the #jobSuggestions element and stores it in the jobSuggestions variable
+                jobSuggestions.empty(); // Clears any existing suggestions in the #jobSuggestions element
+                if (response.jobs && response.jobs.length > 0) { // Checks if the response contains jobs and if the jobs array is not empty
+                    response.jobs.forEach(function(job) { // Loops through each job in the jobs array
+                        jobSuggestions.append('<li>' + job + '</li>'); // Appends each job as a new <li> element to the #jobSuggestions list
+                    });
+                } else { // Executes if the jobs array is empty or not present
+                    jobSuggestions.append('<li>No jobs found</li>');  // Handle case where no jobs are found
+                }
+                console.log("Job suggestions:", response);  // Debugging print
+            },
+            error: function() {
+                alert('Error fetching job suggestions. Please try again.'); // Displays an alert message if an error occurs
+                console.error("Error fetching job suggestions");  // Debugging print
+            }
+        });
+    }
+});
+
+// Handle job selection and fetch skills
+$(document).on('click', '#jobSuggestions li', function() {
+    var selectedJob = $(this).text(); // Get the text value of the selected list item 
+    $('#jobTitleInput').val(selectedJob); // Set the job title input field to the selected job title
+    $('#jobSuggestions').empty(); // Clear the job suggestions list once a job is selected
+
+    // Fetch skills for the selected job
+    $.ajax({
+        url: '/get_job_skills', // Endpoint to fetch job-specific skills from the backend
+        type: 'GET', // HTTP method used for the request 
+        data: {job_title: selectedJob}, // Send the selected job title as a parameter in the request
+        success: function(response) { // Callback function to handle a successful server response
+            var skillsList = $('#skillsList'); // Get the element where the skills will be displayed
+            skillsList.empty(); // Clear any existing skills in the list
+            if (response.skills && response.skills.length > 0) { // Check if the response contains skills and the length is greater than 0
+                response.skills.forEach(function(skill) { // Loops through each skill in the response.skills array
+                    skillsList.append('<li><input type="checkbox" name="skills" value="' + skill + '" checked> ' + skill + '</li>');
+                    // Creates a checkbox for each skill, marks it as checked, and displays the skill name
+                });
+            } else {
+                skillsList.append('<li>No skills found for this job</li>'); // If no skills are found, display a message to the user
+            }
+            console.log("Job skills fetched:", response);  // Debugging statement to check the fetched response in the console
+        },
+        error: function() { // Callback function to handle an error in the request
+            alert('Error fetching job skills.'); // Show an alert if the request fails
+            console.error("Error fetching job skills");  // Debugging print
+        }
+    });
+});
+
+    // Handle CV upload form submission
+    $('#cvUploadForm').on('submit', function(event) { // Add an event listener for the CV upload form submission
+        event.preventDefault(); // Prevent the default form submission behavior 
+        var formData = new FormData(this); // Create a FormData object from the form's data     
+        $.ajax({
+            url: '/upload_cv', // Endpoint to handle CV uploads on the backend
+            type: 'POST', // HTTP method used for the request
+            data: formData, // Send the form data to the server
+            contentType: false, // Prevents jQuery from setting the content type 
+            processData: false, // Prevent jQuery from processing the data
+            success: function(response) { // Callback function to handle a successful server response
+                console.log(response);  // Add this to check the response object
+                if (response.error) { // If the server returns an error in the response
+                    alert(response.error); // Display the error message to the user
+                    return; // Exit the function if there's an error
+                }
+                $('#email').val(response.contact_info.email); // Set the email input field with the extracted email from the CV
+                $('#phone').val(response.contact_info.phone); // Set the phone input field with the extracted phone number from the CV
+                $('#skillsList').empty(); // Clear any existing skills in the list
+                response.skills.forEach(function(skill) { // Loop through the extracted skills in the response
+                    $('#skillsList').append('<li><input type="checkbox" name="skills" value="' + skill + '" checked> ' + skill + '</li>');
+                });
+                $('#cv_text').val(response.cv_text); // Store the extracted CV text in a hidden input field
+                $('#pdfViewer').attr('src', response.pdf_url); // Sets the source of the iframe to the uploaded PDF URL
+                $('#skillsSection').show(); // Show the skills section after a successful upload
+                $('#cvUploadForm').hide(); // Hide the CV upload form once the upload is successful
+            },
+            error: function() { // Callback function to handle an error in the request
+                alert('Error uploading CV. Please try again.'); // Display an alert if the CV upload fails
+            }
+        });
+    });
+
+    // Handle skills form submission
+    $('#skillsForm').on('submit', function(event) {
+        event.preventDefault(); // Prevents the default form submission behavior 
+        var contactInfoData = $('#contactInfoForm').serialize(); // Serialize contact info form data into a query string format 
+        var skillsData = $(this).serialize(); // Serialize skills form data into a query string format 
+        var allData = contactInfoData + '&' + skillsData; // Combine contact info and skills data into a single query string
+
+        $.ajax({
+            url: '/process_skills', // Specifies the endpoint where the skills data will be sent
+            type: 'POST', // Sends the data using the HTTP POST method
+            data: allData, // Passes the serialized skills data to the server
+            success: function() { // Callback function that executes if the request succeeds
+                alert('Your CV, skills, and experience have been saved!'); // Shows a success alert if the request is successful
+                $('#skillsSection').hide(); // Hide the skills section after successful submission
+                $('#emptyPageSection').show(); // Show the section containing games/quizzes related to the CV
+                loadGames(); // Load available Survys/quizzes based on the submitted CV and skills
+            },
+            error: function() { // Callback function that executes if the request fails
+                alert('Error saving skills and experience. Please try again.'); // Shows an error alert if the request fails
+            }
+        });
+    });
+
+    function loadGames() { // Function to load games data from the server
+        $.ajax({ // Start an AJAX request using jQuery
+            url: '/games', // URL endpoint to fetch game data
+            type: 'GET', // HTTP request type (GET to retrieve data)
+            success: function(response) { // Callback function executed on successful response
+                console.log(response);  // Add this to check the response object
+                const games = response.games; // Extract the 'games' array from the response
+                const userSkills = response.user_skills.map(skill => skill.toLowerCase());
+
+                // Ensure the games container is cleared before rendering
+                $('#gamesContainer').empty();
+
+                games.forEach(function(game) {  // Loop through each game object in the 'games' array
+                    const gameBox = document.createElement('div'); // Create a new <div> element for the game box
+                    gameBox.style.margin = '20px'; // Add margin around the game box
+                    gameBox.style.border = '1px solid black'; // Add a black border around the game box
+                    gameBox.style.padding = '10px'; // Add padding inside the game box
+                    gameBox.style.width = '150px'; // Set a fixed width for the game box
+                    gameBox.classList.add('game-box'); // Add a CSS class for additional styling
+
+                    const gameImg = document.createElement('img'); // Create an <img> element for the game image
+                    gameImg.src = game.image; // Set the image source to the game's image URL
+                    gameImg.alt = game.name; // Set the alternative text for the image for accessibility
+                    gameImg.style.width = '100%'; // Ensure the image scales to fit the width of the box
+
+                    const gameTitle = document.createElement('h3'); // Create an <h3> element for the game title
+                    gameTitle.innerText = game.name; // Set the text of the game title to the game name
+
+                    const gameStatus = document.createElement('p'); // Create a <p> element for the game status
+                    gameStatus.innerText = game.status; // Set the text of the game status to the game's status
+
+                    gameBox.appendChild(gameImg); // Append the game image to the game box
+                    gameBox.appendChild(gameTitle); // Append the game title to the game box
+                    gameBox.appendChild(gameStatus); // Append the game status to the game box
+
+                    gameBox.addEventListener('click', function() { // Add a click event listener to the game box
+                        console.log("Loading details for:", game.name);  // Debugging to check if the function is triggered
+                        loadGameDetails(game.name); // Call the loadGameDetails function when the game box is clicked
+                    });
+
+                    document.getElementById('gamesContainer').appendChild(gameBox); // Append the gameBox to the games container in the DOM
+                });
+            },
+            error: function() { // Callback function executed if the AJAX request fails
+                alert('Error loading games. Please try again.'); // Display an alert message if there’s an error loading the data
+            }
+        });
+    }
+
+    function loadGameDetails(gameName) { // Send an AJAX request to get the details of a specific game
+        $.ajax({
+            url: `/game/${gameName}`, // API endpoint to get game details based on gameName
+            type: 'GET', // HTTP request type (GET to retrieve data)
+            success: function(response) { 
+                console.log(response);  // Add this to check the response object
+                // Check if the response contains an error
+                if (response.error) { 
+                    alert(response.error); // Display the error message in an alert
+                    return; // Exit the function if there's an error
+                }
+                $('#gameName').text(gameName);  // Sets the name of the game
+                $('#gameDescription').text(response.description);  // Sets the description of the game
+                $('#gameSkills').text(response.skills_required.join(', '));  // Displays the required skills for the game
+                $('#gameImage').attr('src', response.image);  // Displays the image for the game
+                // Show the matched skills
+
+                // If matched skills exist, join them into a string; otherwise, display "None" this is done for both the codes below
+                //const matchedSkills = response.matched_skills.length ? response.matched_skills.join(', ') : "None"; 
+                //const missingSkills = response.missing_skills.length ? response.missing_skills.join(', ') : "None";
+                const matchedSkills = (response.matched_skills && response.matched_skills.length) ? response.matched_skills.join(', ') : "None";
+
+                const missingSkills = (response.missing_skills && response.missing_skills.length) ? response.missing_skills.join(', ') : "None";
+
+                $('#gameMatchedSkills').text("Skills you have: " + matchedSkills);  // Display matched skills
+                $('#gameMissingSkills').text("Skills you're missing: " + missingSkills);  // Display missing skills
+
+
+                
+                $('#gameMatchedSkills').text("Skills you have: " + matchedSkills);  // Display matched skills
+                $('#gameMissingSkills').text("Skills you're missing: " + missingSkills);  // Display missing skills
+                $('#emptyPageSection').hide();  // Hide the games list
+                $('#gameDetailSection').show();  // Show the selected game's details
+            },
+            error: function() {
+                alert('Error loading game details.'); // Show an alert if the request fails
+            }
+        });
+    }
+    // Add a click event handler to the "Back to Games" button
+    $('#backToGames').on('click', function() {
+        $('#gameDetailSection').hide();  // Hide game details
+        $('#emptyPageSection').show();  // Show the games list again
+    });
+</script>
+</body>
+</html>

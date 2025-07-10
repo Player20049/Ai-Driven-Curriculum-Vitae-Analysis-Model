@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JD and CV Analysis</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Analyze JD and CVs</h1>
+    <form id="analyze-form" enctype="multipart/form-data">
+        <label for="jd_files">Upload Job Descriptions (JDs):</label><br>
+        <input type="file" id="jd_files" name="jd_files" accept=".pdf,.docx" multiple required><br><br>
+
+        <label for="cv_files">Upload Candidate CVs (PDFs):</label><br>
+        <input type="file" id="cv_files" name="cv_files" accept=".pdf,.docx" multiple required><br><br>
+
+        <button type="submit">Analyze</button>
+    </form>
+
+    <h2>Results</h2>
+    <table border="1" id="results-table">
+        <thead>
+            <tr>
+                <th>JD Name</th>
+                <th>CV Name</th>
+                <th>Similarity Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Results will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+        $(document).ready(function() {
+            $('#analyze-form').submit(function(e) {
+                e.preventDefault();
+
+                let formData = new FormData(this);
+
+                $.ajax({
+                    url: '/option3',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        let results = response.results;
+                        let resultsTable = $('#results-table tbody');
+                        resultsTable.empty();
+
+                        results.forEach(result => {
+                            resultsTable.append(`
+                                <tr>
+                                    <td>${result.jd_name}</td>
+                                    <td>${result.cv_name}</td>
+                                    <td>${result.similarity_score}</td>   
+                                </tr>
+                            `);
+                        });
+                    },
+                    error: function(err) {
+                        alert('Error: ' + err.responseJSON.error);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+
+<!-- (Orginally in line 61 and 62) <td>${result.matched_keywords.join(', ')}</td>
+                               <td>${result.total_matches}</td>  -->

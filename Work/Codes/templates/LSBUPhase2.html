@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JD Matching</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <h1>Upload Your Job Description to Find Matching CVs</h1>
+  <form id="jdUploadForm" method="POST" enctype="multipart/form-data">
+    <label for="jd_file">Select JD File (PDF or DOCX):</label>
+    <input type="file" id="jd_file" name="jd_file" required>
+    <button type="submit">Upload JD</button>
+  </form>
+
+  <div id="results" style="display: none;">
+    <h2>Job Description Skills Found</h2>
+    <ul id="jdSkillsList"></ul>
+
+    <h2>Matching CVs</h2>
+    <table border="1" id="cvMatchesTable">
+      <thead>
+        <tr>
+          <th>CV ID</th>
+          <th>Match Score (%)</th>
+          <th>Matched Skills</th>
+          <th>CV Skills</th>
+          <th>Contact Info</th>
+        </tr>
+      </thead>
+      <tbody>
+      <!-- Rows dynamically populated -->
+      </tbody>
+    </table>
+  </div>
+
+<script>
+$(document).ready(function(){
+  $('#jdUploadForm').on('submit', function(e){
+    e.preventDefault();
+    var formData = new FormData(this);
+
+    $.ajax({
+      url: '/upload_jd',
+      type: 'POST',
+      data: formData,
+      contentType: false,
+      processData: false,
+      success: function(response){
+        if(response.error){
+          alert(response.error);
+          return;
+        }
+
+        // Show results
+        $('#results').show();
+
+        // Show JD skills found
+        $('#jdSkillsList').empty();
+        response.jd_skills_found.forEach(function(skill){
+          $('#jdSkillsList').append('<li>' + skill + '</li>');
+        });
+
+        // Populate CV matches table
+        var tbody = $('#cvMatchesTable tbody');
+        tbody.empty();
+        response.cv_matches.forEach(function(cv){
+          var matchedSkillsString = cv.matched_skills.join(', ');
+          var allSkillsString = cv.skills.join(', ');
+          var email = cv.contact_info.email ? cv.contact_info.email : "N/A";
+          var phone = cv.contact_info.phone ? cv.contact_info.phone : "N/A";
+
+          var row = '<tr>' +
+                      '<td>' + cv.cv_id + '</td>' +
+                      '<td>' + cv.match_score.toFixed(2) + '</td>' +
+                      '<td>' + matchedSkillsString + '</td>' +
+                      '<td>' + allSkillsString + '</td>' +
+                      '<td>Email: ' + email + '<br>Phone: ' + phone + '</td>' +
+                    '</tr>';
+          tbody.append(row);
+        });
+      },
+      error: function(){
+        alert('Error uploading JD. Please try again.');
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
